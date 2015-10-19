@@ -1,0 +1,331 @@
+import java.io.BufferedReader;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileReader;
+import java.io.InputStreamReader;
+import java.util.*;
+
+
+
+
+
+
+
+public class Trie {
+
+	static class TrieNode {
+		static int counter = 0;
+		int id;
+		Map<Character, TrieNode> children = new TreeMap<Character, TrieNode>();
+		boolean leaf;
+		TrieNode parent;
+		char fromParent;
+		public Map<TrieNode, Integer> activeNodes = new HashMap<Trie.TrieNode, Integer>();
+		Map<TrieNode, Integer> piactiveNodes = new HashMap<Trie.TrieNode, Integer>();
+		public TrieNode(TrieNode p, char x) {
+			this.id = counter;
+			counter++;
+			parent = p;
+			fromParent = x;// holding current node character
+		}
+
+
+		Map<TrieNode, Integer> buildActiveNodes(int depth) {
+
+			Map<TrieNode, Integer> parentActiveNodes = parent.activeNodes;
+			// deletion
+			// add all p active node to this, with distance +1 if possible
+			for (TrieNode n : parentActiveNodes.keySet()) {
+				int l = parentActiveNodes.get(n) ;
+				if (n.id == parent.id || l < depth)
+					activeNodes.put(n, parentActiveNodes.get(n) + 1);
+				if (n.fromParent == fromParent) {
+					getDescendant(activeNodes, depth, l);
+				}
+				for (TrieNode c : n.children.values()) {
+					if (c == this)
+						continue;
+					// insertion
+					if (c.fromParent == fromParent) {// we have a match
+						c.getDescendant(activeNodes, depth, l);
+					}
+					else if (l <= depth) {
+
+						int m = min(l + 1, activeNodes.get(c));
+						if (m <= depth)
+							activeNodes.put(c, m);
+					}
+
+				}
+
+			}
+
+
+			// add myself & my Descendant
+			activeNodes.put(this, 0);
+			return activeNodes;
+		}
+
+
+
+		private int min(int i, Object v) {
+			if (v == null)
+				return i;
+			int vv = (Integer) v;
+			if (vv > i)
+				return i;
+			return vv;
+		}
+
+		public Map<TrieNode, Integer> getDescendant(
+				Map<TrieNode, Integer> descendents, int depth, int k) {
+			class pair {
+				public TrieNode n;
+				public int depth;
+
+				public pair(TrieNode n, int depth) {
+					this.n = n;
+					this.depth = depth;
+				}
+			}
+
+			ArrayList<pair> queue = new ArrayList<pair>();
+			queue.add(new pair(this, k));
+			if (k > depth)
+				return descendents;
+			descendents.put(this, k);
+			while (!queue.isEmpty()) {
+				// get the first node of the queue
+				pair p = queue.remove(0);
+				// add children to the queue
+				if (p.depth < depth) {
+					for (TrieNode c : p.n.children.values()) {
+						Object v = descendents.get(c);
+						int vv = min(p.depth + 1, v);
+						if (vv <= depth) {
+							descendents.put(c, vv);
+							queue.add(new pair(c, vv));
+						}
+					}
+				}
+			}
+			return descendents;
+		}
+
+
+		@Override
+		public String toString() {
+
+			return "TrieNode [id=" + id + "]";
+		}
+	}
+	//builds all activenodes
+	static void buildActiveNodes(TrieNode root, int depth) {
+		root(root, root.activeNodes, 0, depth);
+		children(root, depth);
+	}
+
+	private static void children(TrieNode root, int depth) {
+		for (char c : root.children.keySet()) {
+			root.children.get(c).buildActiveNodes(depth);
+			children(root.children.get(c), depth);
+		}
+	}
+
+	static void root(TrieNode node, Map<TrieNode, Integer> activeNodes,
+			int depth, int limit) {
+		if (depth > limit)
+			return;
+
+		activeNodes.put(node, depth);
+
+		for (char c : node.children.keySet()) {
+			root(node.children.get(c), activeNodes, depth + 1, limit);
+		}
+
+	}
+	public static  Map<TrieNode, Integer> IncrementalBuildActiveNode(char ch, Map<TrieNode, Integer> cparentActiveNodes, int depth ) {
+		Map<TrieNode, Integer> curactiveNodes = new HashMap<Trie.TrieNode, Integer>();
+		// deletion
+		// add all p active node to this, with distance +1 if possible
+		for (TrieNode n : cparentActiveNodes.keySet()) {
+			int l = cparentActiveNodes.get(n) ;
+
+			if (l < depth)
+				curactiveNodes.put(n, cparentActiveNodes.get(n) + 1);
+			
+			for (TrieNode c : n.children.values()) {
+
+				// insertion
+				if (c.fromParent==ch) {// we have a match
+					c.getDescendant(curactiveNodes, depth, l);
+				}
+				else if (l <= depth) {
+
+					int m = c.min(l + 1, curactiveNodes.get(c));
+					if (m <= depth)
+						curactiveNodes.put(c, m);
+				}
+
+			}
+
+		}
+
+		return curactiveNodes;
+
+
+	}
+
+	public static void matchString(TrieNode root, String s, int depth){
+		//root(root, root.activeNodes, 0, depth);
+		TrieNode v = root;
+		Map <TrieNode,Integer> activenodes=v.activeNodes;
+
+		TrieNode next = v;
+		int indx=0;
+		boolean b=false;
+		for (char ch : s.toCharArray()) {
+			next = v.children.get(ch);
+			indx++;
+			if (next==null) {
+				b=true;
+				break;
+			}
+			activenodes=next.activeNodes;
+			//System.out.println("active:"+ch+activenodes);
+			v=next;
+		}
+
+		if ( b==true){
+
+			for(int i=indx-1;i<s.length();i++){
+
+				char ch=s.charAt(i);
+
+				activenodes = IncrementalBuildActiveNode(ch,activenodes , depth);
+				//System.out.println("active:"+ch+activenodes);	
+
+			}
+		}
+		//System.out.println("active:"+activenodes);
+
+		String sim = null;
+
+		for(TrieNode t:activenodes.keySet()){
+			if(t.leaf==true){
+			sim="";
+			System.out.println("node:"+t.id);
+			while (t.id!=0)
+			{
+				char c=	t.fromParent;
+
+				sim=c+sim;
+				t=t.parent;
+
+			}
+			System.out.println("simi Word :"+sim);
+		}
+		}
+		
+
+	}
+
+
+
+
+
+	public static TrieNode insertString(TrieNode root, String s, int depth) {
+		root(root, root.activeNodes, 0, depth);
+		TrieNode v = root;
+		Map<TrieNode, Integer> activeNodes = v.activeNodes;
+		TrieNode next = v;
+		for (char ch : s.toCharArray()) {
+			next = v.children.get(ch);
+			//System.out.println("ch: "+ch);
+			if ( next == null)
+				v.children.put(ch, next = new TrieNode(v, ch));
+			for (TrieNode n : v.activeNodes.keySet())
+				n.activeNodes.put(v, v.activeNodes.get(n));
+			next.buildActiveNodes(depth);
+			activeNodes = next.activeNodes;
+			v = next;
+		}
+		for (TrieNode n : next.activeNodes.keySet())
+			n.activeNodes.put(v, v.activeNodes.get(n));
+		v.leaf = true;
+		return v;
+	}
+
+	public static int printActiveNodes(TrieNode node) {
+		int ret = 0;
+		//System.out.println(node.leaf);
+		//if(node.leaf==true){
+		System.out.println( node.fromParent  +" => "
+				+ node.activeNodes.toString());
+
+		ret += node.activeNodes.size();
+		//}
+		
+		for (Character ch : node.children.keySet()) {
+			ret += printActiveNodes(node.children.get(ch));
+		}
+
+
+		return ret;
+	}
+	public static String printsimilars(TrieNode node) {
+		String s = null;
+
+		for(TrieNode t:node.activeNodes.keySet()){
+			s="";
+			System.out.println("//"+t.id);
+			while (t.id!=0)
+			{
+				char c=	t.fromParent;
+
+				s=c+s;
+				t=t.parent;
+
+			}
+			System.out.println("simi Word="+s);
+		}
+		return s;
+	}
+
+	// Usage example
+	public static void main(String[] args) throws Exception {
+		TrieNode root = new TrieNode(null, '\0');
+		File file = new File("author.data");
+		FileInputStream fIn = new FileInputStream(file);
+		BufferedReader in = new BufferedReader(new InputStreamReader(fIn));
+		//BufferedReader in = new BufferedReader(new FileReader("author.data"));
+		final long startTime = System.currentTimeMillis();
+		while (true) {
+			String line = in.readLine();
+			if (line == null || line.equals(""))
+				break;
+			
+			insertString(root, line,2);// for dynamic tries
+			
+		}
+		final long duration = System.currentTimeMillis() - startTime;
+		System.out.println("Insertion time :"+duration);
+		//System.out.println("done");
+		
+		fIn.getChannel().position(0);
+		in = new BufferedReader(new InputStreamReader(fIn));
+		final long startTime2 = System.currentTimeMillis();
+		while(true){
+		String s=in.readLine();;
+		if (s == null || s.equals(""))
+			break;
+		//String s="l";
+		matchString(root, s, 2);
+		}
+		final long duration2 = System.currentTimeMillis() - startTime2;
+		System.out.println("Matching time :"+duration2);
+		//System.out.println(root.children.toString());
+
+
+	}
+}
